@@ -1,0 +1,295 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.1.0.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <title>Tehtävä 55</title>
+    <style>
+        .ui-widget-overlay {
+            opacity: 1;
+        }
+        .ui-dialog-titlebar-close {
+            visibility: hidden;
+        }        
+        
+        table, th, td {
+            border: 1px solid #000;
+        }
+        th, td {
+            padding: 10px;
+        }
+
+        #lisays {
+            margin: 1em;
+        }
+        #dialogi {
+            display: none;
+        }
+        #dialogi input[type="text"] {
+            display: block;
+        }
+    </style>
+    <script>
+        $(document).ready(function () {
+            haeAsiakastyypit();
+
+            $("#hakulomake").submit(function(event) {
+                var hakulauseke = $(this).serializeArray();
+                if (hakulauseke[hakulauseke.length-1]["value"] == "") {
+                    hakulauseke.pop();
+                }
+                console.log("Hakulauseke: " + $.param(hakulauseke));
+                haeAsiakkaat($.param(hakulauseke));
+                event.preventDefault();
+            });
+
+            $("#dialogi").dialog({
+                    autoOpen: false,
+                    buttons: [
+                        {
+                            id: "dialogiNappi",
+                            text: "Lisää",
+                            click: function() {
+                                if ($.trim($("#nimi_lisays").val()) === "" || $.trim($("#osoite_lisays").val()) === "" || $.trim($("#postinro_lisays").val()) === "" || $.trim($("#postitmp_lisays").val()) === "" || $.trim($("#asty_avain_lisays").val()) === "") {
+                                    alert("Anna arvo kaikki kenttiin!");
+                                    return false;
+                                } else {
+                                    var toiminto = $("#dialogiNappi").button("option", "label");
+                                    var lauseke = $("#lisayslomake").serialize();
+
+                                    if (toiminto === "Muokkaa") { // Muokataan
+                                        console.log("Muokkauslauseke: " + lauseke);
+                                        muokkaaAsiakas(lauseke, $("#avain_muokkaus").val());
+                                    } else { // Lisätään
+                                        console.log("Lisäyslauseke: " + lauseke);
+                                        lisaaAsiakas(lauseke);
+                                    }
+
+                                    $("#lisayslomake")[0].reset();
+                                    $("#asty_avain_lisays").prepend('<option value=""></option>');
+                                    $("#asty_avain_lisays").prop('selectedIndex', 0);
+                                    $(this).dialog("close");
+
+                                    if (toiminto === "Muokkaa") { // // Palautetaan lomake lisäystyyppiseksi                                        
+                                        $("#dialogi").dialog("option", "title", "Lisää uusi asiakas");
+                                        $('#dialogiNappi').button('option', 'label', 'Lisää');
+                                        $("#avain_muokkaus").remove();
+                                    }
+                                }
+                            },
+                        },
+                        {
+                            text: "Peruuta",
+                            click: function() {
+                                $("#lisayslomake")[0].reset();
+                                $("#asty_avain_lisays").prepend('<option value=""></option>');
+                                $("#asty_avain_lisays").prop('selectedIndex', 0);
+                                $(this).dialog("close");
+
+                                if ($("#dialogiNappi").button("option", "label") === "Muokkaa") { // // Palautetaan lomake lisäystyyppiseksi                                        
+                                    $("#dialogi").dialog("option", "title", "Lisää uusi asiakas");
+                                    $('#dialogiNappi').button('option', 'label', 'Lisää');
+                                    $("#avain_muokkaus").remove();
+                                }
+                            },
+                        }
+                    ],
+                    closeOnEscape: false,
+                    draggable: false,
+                    modal: true,
+                    resizable: false
+            });
+
+            $("#lisays").click(function() {
+                $("#dialogi").dialog("open");
+            });
+        });
+
+        function haeAsiakastyypit() {
+            $.get(
+                "http://localhost:3000/api/asiakas/tyypit" 
+            ).done(function (data, textStatus, jqXHR) {
+                data.forEach(function (tyyppi) {
+                    $('#asty_avain_haku')
+                        .append($("<option></option>")
+                            .attr("value", tyyppi.avain)
+                            .text(tyyppi.lyhenne + " - " + tyyppi.selite));
+                    $('#asty_avain_lisays')
+                        .append($("<option></option>")
+                            .attr("value", tyyppi.avain)
+                            .text(tyyppi.lyhenne + " - " + tyyppi.selite));
+                });
+            }).fail(function (jqXHR, textStatus, errorThrown) {
+                console.log("status=" + textStatus + ", " + errorThrown);
+            });
+        }
+
+        function haeAsiakkaat(hakulauseke) {
+            $.get(
+                "http://localhost:3000/api/asiakas/haku", 
+                hakulauseke
+            ).done(function(data, textStatus, jqXHR) {
+                $("#asiakkaat").empty(); //Poistetaan vanhat arvot taulukosta
+
+                var asiakkaat = document.getElementById("asiakkaat");
+                if (data.length == 0) {
+                    rivi = asiakkaat.insertRow(-1);
+                    rivi.insertCell(-1).outerHTML = "<td colspan=\"9\">Hakuehtojasi vastaavia asiakkaita ei löytynyt.</td>";
+                } else {
+                    data.forEach(function (asiakas) {
+                        rivi = asiakkaat.insertRow(-1);
+                        rivi.insertCell(-1).outerHTML = "<td>" + asiakas.avain + "</td>";
+                        rivi.insertCell(-1).outerHTML = "<td>" + asiakas.nimi + "</td>";
+                        rivi.insertCell(-1).outerHTML = "<td>" + asiakas.osoite + "</td>";
+                        rivi.insertCell(-1).outerHTML = "<td>" + asiakas.postinro + "</td>";
+                        rivi.insertCell(-1).outerHTML = "<td>" + asiakas.postitmp + "</td>";
+                        rivi.insertCell(-1).outerHTML = "<td>" + asiakas.luontipvm + "</td>";
+                        rivi.insertCell(-1).outerHTML = "<td>" + asiakas.asty_avain + "</td>";
+                        rivi.insertCell(-1).outerHTML = "<td><button onclick=\"poistaAsiakas(" + asiakas.avain + ")\">Poista asiakas</button></td>";
+                        rivi.insertCell(-1).outerHTML = "<td><button onclick=\"muokkausLomake(" + asiakas.avain + ")\">Muuta asiakkaan tietoja</button></td>";
+                    });
+                }
+            }).fail(function (jqXHR, textStatus, errorThrown) {
+                console.log("status=" + textStatus + ", " + errorThrown);
+            });
+        }
+
+        function lisaaAsiakas(lisayslauseke) {
+            $.post(
+                "http://localhost:3000/api/asiakas/lisaa",
+                lisayslauseke
+            ).done(function (data, textStatus, jqXHR) {
+                if (data.hasOwnProperty('status') && data.status === "not ok") {
+                    alert("Lisäys ei onnistunut: " + data.status_text);
+                }
+                $("#hakulomake")[0].reset();
+                $("#asty_avain_haku").prop('selectedIndex', 0);
+                $("#hakulomake").submit();
+            }).fail(function (jqXHR, textStatus, errorThrown) {
+                console.log("status=" + textStatus + ", " + errorThrown);
+            });
+        }
+
+        function poistaAsiakas(avain) {
+            $.ajax({
+                 url: "http://localhost:3000/api/asiakas/poista/" + avain, 
+                 type: 'DELETE',
+                 success: function (data, status, jqXHR) {
+                    if (data.hasOwnProperty('status') && data.status === "not ok") {
+                        alert("Poisto ei onnistunut: " + data.status_text);
+                    }
+                    $("#hakulomake")[0].reset();
+                    $("#asty_avain_haku").prop('selectedIndex', 0);
+                    $("#hakulomake").submit();
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    console.log("status=" + textStatus + ", " + errorThrown);
+                }
+            });
+        }
+
+       
+        function muokkausLomake(avain) {
+            $.get(
+                "http://localhost:3000/api/asiakas/" + avain,
+            ).done(function (data, textStatus, jqXHR) {
+                if (data.hasOwnProperty('status') && data.status === "not ok") {
+                    alert("Asiakkaan (avain: " + avain + ") tietojen haku ei onnistunut: " + data.status_text);
+                }
+
+                if (data.length == 0) {
+                    alert("Avaimella " + avain + " ei löytynyt yhtään asiakasta!");
+                } else {
+                    $("#dialogi").dialog("option", "title", "Muuta tietoja");
+                    $('#dialogiNappi').button('option', 'label', 'Muokkaa');
+                    $("#lisayslomake").prepend('<input type="hidden" id="avain_muokkaus" name="avain" value="' + data[0].avain + '" readonly="readonly">');
+
+                    $("#asty_avain_lisays option[value='']").remove();
+
+                    $("#nimi_lisays").val(data[0].nimi);
+                    $("#osoite_lisays").val(data[0].osoite);
+                    $("#postinro_lisays").val(data[0].postinro);
+                    $("#postitmp_lisays").val(data[0].postitmp);
+                    $("#asty_avain_lisays").val(data[0].asty_avain);
+
+                    $("#dialogi").dialog("open");
+                }
+            }).fail(function (jqXHR, textStatus, errorThrown) {
+                console.log("status=" + textStatus + ", " + errorThrown);
+            });
+        }
+
+        function muokkaaAsiakas(muokkauslauseke, avain) {
+            $.ajax({
+                url: "http://localhost:3000/api/asiakas/" + avain,
+                method: 'post',
+                data: muokkauslauseke,
+                success: function (data, status, jqXHR) {
+                    if (data.hasOwnProperty('status') && data.status === "not ok") {
+                        alert("Muokkaus ei onnistunut: " + data.status_text);
+                    }
+                    $("#hakulomake")[0].reset();
+                    $("#asty_avain_haku").prop('selectedIndex', 0);
+                    $("#hakulomake").submit();
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    console.log("status=" + textStatus + ", " + errorThrown);
+                }
+            });
+        }
+    </script>
+</head>
+<body>
+    <form id="hakulomake">
+        <fieldset>
+            <legend>Hakuehdot</legend>
+            <label for="nimi_haku">Nimi:</label>
+            <input type="text" id="nimi_haku" name="nimi">
+            <label for="osoite_haku">Osoite:</label>
+            <input type="text" id="osoite_haku" name="osoite">
+            <label for="asty_avain_haku">Asiakastyyppi:</label>
+            <select id="asty_avain_haku" name="asty_avain">
+                <option value=""></option>
+            </select>
+            <input type="submit" value="Hae">
+        </fieldset>
+    </form>
+
+    <button id="lisays">Lisää asiakas</button>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Avain</th>
+                <th>Nimi</th>
+                <th>Osoite</th>
+                <th>Postinumero</th>
+                <th>Postitoimipaikka</th>
+                <th>Luontipäivämäärä</th>
+                <th>Asiakastyyppiavain</th>
+                <th colspan="2"></th>
+            </tr>  
+        </thead>          
+        <tbody id="asiakkaat">
+            <tr>
+                <td colspan="9">Aseta haluamasi hakuehdot ylläolevaan lomakkeeseen ja paina Hae-nappia.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div id="dialogi" title="Lisää uusi asiakas">
+        <form id="lisayslomake">
+            <input type="text" id="nimi_lisays" name="nimi" placeholder="Nimi">
+            <input type="text" id="osoite_lisays" name="osoite" placeholder="Osoite">
+            <input type="text" id="postinro_lisays" name="postinro" placeholder="Postinumero">
+            <input type="text" id="postitmp_lisays" name="postitmp" placeholder="Postitoimipaikka">
+            <select id="asty_avain_lisays" name="asty_avain">
+                    <option value=""></option>
+            </select>
+        </form>
+    </div>
+</body>
+</html>
